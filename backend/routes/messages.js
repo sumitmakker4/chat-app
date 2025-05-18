@@ -3,6 +3,28 @@ const router = express.Router();
 const Message = require('../models/Message');
 const User = require('../models/User');
 
+router.post('/', async (req, res) => {
+  const { senderId, receiverId, content } = req.body;
+
+  if (!senderId || !receiverId || !content) {
+    return res.status(400).json({ error: 'senderId, receiverId, and content are required' });
+  }
+
+  try {
+    const newMessage = new Message({
+      sender: senderId,
+      receiver: receiverId,
+      content,
+    });
+
+    const savedMessage = await newMessage.save();
+
+    res.status(201).json(savedMessage);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
 router.get('/chat-users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -47,18 +69,19 @@ router.get('/chat-users/:userId', async (req, res) => {
 router.get('/conversation', async (req, res) => {
   try {
     const { user1, user2 } = req.query;
+    
     if (!user1 || !user2) {
       return res.status(400).json({ error: 'Both user1 and user2 are required' });
     }
 
     // Find messages where (from=user1 and to=user2) OR (from=user2 and to=user1)
     const messages = await Message.find({
-      $or: [
-        { from: user1, to: user2 },
-        { from: user2, to: user1 }
-      ]
-    }).sort({ createdAt: 1 }); // Sort by oldest first
-
+    $or: [
+      { sender: user1, receiver: user2 },
+      { sender: user2, receiver: user1 }
+    ]
+  }).sort({ createdAt: 1 }); // Sorted oldest to newest
+    
     res.json(messages);
   } catch (err) {
     console.error(err);

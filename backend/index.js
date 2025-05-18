@@ -30,9 +30,15 @@ mongoose
 
 const User = require('./models/User');
 
+let onlineUsers = []
+
+function getSocketIdByUserId(userId) {
+  const user = onlineUsers.find(user => user.id == userId);
+  return user ? user.socket_id : null;
+}
+
 io.on('connection', (socket) => {
 
-  // Handle user coming online
   socket.on('user-online', async (userId) => {
     await User.findByIdAndUpdate(userId, {
       is_online: true,
@@ -40,50 +46,42 @@ io.on('connection', (socket) => {
     });
 
     const users = await User.find({ is_online: true })
-    .select('_id name')
+    .select('_id name socket_id')
 
-    const onlineUsers = users.map(user => ({
+    onlineUsers = users.map(user => ({
       id: user._id.toString(),
       name: user.name,
+      socket_id: user.socket_id
     }));
 
     io.emit('online-users', onlineUsers);
   });
 
-  socket.on('send-message', async ({ senderId, receiverId, text }) => {
-    try {
-      const newMessage = await Message.create({
-        sender: senderId,
-        receiver: receiverId,
-        text,
-      });
-
-      const receiver = await User.findById(receiverId);
-      if (receiver?.socket_id) {
-        io.to(receiver.socket_id).emit('receive-message', {
-          senderId,
-          text,
-          createdAt: newMessage.createdAt,
-        });
-      }
-    } catch (err) {
-      console.error('Error sending message:', err);
+  socket.on('typing', async ({ to, from }) => {
+    if (!to || !from) return;
+    const toUser = await User.findById(to);
+    if (toUser?.socket_id) {
+      io.to(toUser.socket_id).emit('typing', { from });
     }
   });
 
-  socket.on('join-chat', (chatId) => {
-    socket.join(chatId);
+  socket.on('stop-typing', async ({ to, from }) => {
+    if (!to || !from) return;
+    const toUser = await User.findById(to);
+    if (toUser?.socket_id) {
+      io.to(toUser.socket_id).emit('stop-typing', { from });
+    }
   });
 
-  socket.on('typing', ({ to, from }) => {
-    if (!to || !from) return;
-    // Emit to the recipient's socket only
-    socket.to(to).emit('typing', from); // send 'typing' event with from id
-  });
-
-  socket.on('stop-typing', ({ to, from }) => {
-    if (!to || !from) return;
-    socket.to(to).emit('stop-typing', from); // send 'stop-typing' event with from id
+  socket.on('send-message', (message) => {
+    const receiverSocketId = getSocketIdByUserId(message.receiver)
+    console.log('send-message received:', message);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('message-received', message);
+      console.log(`Sent message to receiver socket ${receiverSocketId}`);
+    }
+    // Optionally emit back to sender (acknowledgement)
+    socket.emit('message-sent', message);
   });
 
   socket.on('disconnect', async () => {

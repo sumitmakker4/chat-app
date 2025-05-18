@@ -29,31 +29,28 @@ export default function Sidebar() {
     fetchChatUsers();
   }, [user]);
 
-  function ChatItem({ user: chatUser }) {
-    const isOnline = onlineUsers.includes(chatUser.id);
-    // typingUsers is an object with chatId or userId keys; here using userId (chatUser.id) as key
-    const isTyping = typingUsers[chatUser.id];
+  function ChatItem({ user }) {
+    const isOnline = onlineUsers.includes(user.id);
+    const isTyping = typingUsers[user.id];
 
     return (
       <li
-        key={chatUser.id}
-        onClick={() => setSelectedChat(chatUser)}
+        key={user.id}
+        onClick={() => setSelectedChat(user)}
         className={`cursor-pointer p-3 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-between ${
-          selectedChat?.id === chatUser.id ? 'bg-blue-100' : ''
+          selectedChat?.id === user.id ? 'bg-blue-100' : ''
         }`}
       >
         <div>
           <div className="font-semibold flex items-center space-x-2">
             <span
               title={isOnline ? 'Online' : 'Offline'}
-              className={`w-3 h-3 rounded-full ${
-                isOnline ? 'bg-green-500' : 'bg-gray-400'
-              }`}
+              className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}
             ></span>
-            <span>{chatUser.name}</span>
+            <span>{user.name}</span>
           </div>
           <div className="text-sm text-gray-500">
-            {isTyping ? <span className="italic text-blue-500">Typing...</span> : chatUser.lastMessage}
+            {isTyping && <span className="italic text-blue-500">Typing...</span>}
           </div>
         </div>
       </li>
